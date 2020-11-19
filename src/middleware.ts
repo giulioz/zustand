@@ -1,3 +1,4 @@
+import { UseStore } from '.'
 import {
   GetState,
   PartialState,
@@ -153,11 +154,27 @@ export const persist = <S extends State>(
   ;(async () => {
     try {
       const storedState = await storage.getItem(name)
-      if (storedState) set(await deserialize(storedState))
+      if (storedState) {
+        const deserialized = await deserialize(storedState)
+        set({ ...deserialized, _PERSIST_READY_: true })
+      }
     } catch (e) {
       console.error(new Error(`Unable to get to stored state in "${name}"`))
     }
   })()
 
   return state
+}
+
+export function waitForPersist(store: UseStore<any>) {
+  if (!(store.getState() as any)._PERSIST_READY_) {
+    throw new Promise<void>((resolve) => {
+      const unsub = store.subscribe((s) => {
+        if (s && (s as any)._PERSIST_READY_) {
+          unsub()
+          resolve()
+        }
+      })
+    })
+  }
 }
